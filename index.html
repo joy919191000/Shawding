@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+<title>跟讀練習室</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: tablet-first two-pane studio (video left, sentence list right), stacks to one column on phones */
+:root{
+  --bg:#f3f5f7; --panel:#ffffff; --ink:#18232e; --muted:#5d6b78; --line:#d9e0e6;
+  --accent:#1d5fa8; --accent-soft:#e3edf8; --rec:#c8323b; --ok:#2f7d4f; --warn:#a86a10;
+  --display:"Space Grotesk","Noto Sans TC",system-ui,sans-serif;
+  --body:"Noto Sans TC",system-ui,-apple-system,"PingFang TC",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11161b; --panel:#1a2128; --ink:#e6ecf1; --muted:#97a5b2; --line:#2c3640;
+  --accent:#6aa8ec; --accent-soft:#1f3044; --rec:#ef6a70; --ok:#6cc48f; --warn:#e2a64a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11161b; --panel:#1a2128; --ink:#e6ecf1; --muted:#97a5b2; --line:#2c3640;
+  --accent:#6aa8ec; --accent-soft:#1f3044; --rec:#ef6a70; --ok:#6cc48f; --warn:#e2a64a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+h1{font-family:var(--display);font-size:1.5rem;margin:0;letter-spacing:.01em}
+h1 small{font-family:var(--body);font-weight:400;font-size:.85rem;color:var(--muted);margin-left:8px}
+h2{font-family:var(--display);font-size:1.05rem;margin:0}
+.tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:4px}
+.tabs button{border:0;background:transparent;color:var(--muted);padding:8px 16px;border-radius:7px;font:inherit;font-weight:500;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:#fff}
+.badge{display:inline-block;min-width:1.4em;padding:0 .4em;margin-left:6px;border-radius:99px;background:var(--rec);color:#fff;font-size:.75rem;text-align:center}
+.grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.videobox{position:relative;background:#000;border-radius:10px;overflow:hidden;display:flex;justify-content:center;max-height:62vh}
+.videobox video{max-width:100%;max-height:62vh;display:block}
+#ytBox{width:100%;aspect-ratio:16/9;max-height:62vh;margin:0 auto}
+#ytBox.short{aspect-ratio:9/16;width:auto;height:62vh;max-width:100%}
+#ytBox iframe,#ytBox > div{width:100%;height:100%;display:block;border:0}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:24px 16px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center}
+.drop ol{text-align:left;margin:0;padding-left:1.3em;color:var(--muted);max-width:34em}
+.or{color:var(--muted);font-size:.85rem}
+.urlrow{display:flex;gap:8px;width:100%;max-width:34em}
+.urlrow input{flex:1;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:9px 14px;cursor:pointer;min-height:42px;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible,.tabs button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.rec{background:var(--rec);border-color:var(--rec);color:#fff}
+.btn.rec.on{animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.6}}
+@media (prefers-reduced-motion:reduce){.btn.rec.on{animation:none}}
+.btn.small{min-height:34px;padding:5px 10px;font-size:.88rem}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+label.btn input{display:none}
+.time{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.9rem;color:var(--muted)}
+select,input[type=text],input[type=url],textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+textarea{width:100%;resize:vertical;min-height:60px}
+.marks{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px;background:var(--accent-soft);border-radius:10px}
+.seglist{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow:auto}
+.seg{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--panel);text-align:left;font:inherit;color:inherit;width:100%}
+.seg[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.seg .n{font-family:var(--display);font-weight:700;color:var(--accent);width:1.8em;text-align:center}
+.seg .t{overflow-wrap:anywhere}
+.seg .t.empty{color:var(--muted);font-style:italic}
+.seg .meta{font-size:.8rem;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.hint{font-size:.85rem;color:var(--muted);margin:0}
+.err{font-size:.85rem;color:var(--rec);margin:0}
+.status{min-height:1.5em;font-weight:500;color:var(--accent)}
+.status.turn{color:var(--warn)}
+.seg-editor{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px}
+.nudge{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.modes{display:flex;flex-wrap:wrap;gap:6px}
+.modes button[aria-pressed="true"],.row button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.take{display:flex;flex-direction:column;gap:6px}
+.take audio,.take video{width:100%;max-height:240px;border-radius:8px;background:#000}
+.empty-note{color:var(--muted);text-align:center;padding:18px 8px}
+.recent{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel);display:flex;flex-direction:column;gap:8px}
+.card .say{font-size:1.15rem;font-weight:500;overflow-wrap:anywhere}
+.card .note{color:var(--muted);overflow-wrap:anywhere}
+.card .src{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
+.pill{display:inline-block;font-size:.75rem;padding:1px 8px;border-radius:99px;border:1px solid currentColor}
+.pill.due{color:var(--rec)} .pill.later{color:var(--ok)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>跟讀練習室<small>一句一句跟著說，錄下來和原音比</small></h1>
+    <div class="tabs" role="tablist">
+      <button id="tabPractice" role="tab" aria-selected="true">練習</button>
+      <button id="tabCards" role="tab" aria-selected="false">複習卡<span id="dueBadge" class="badge" hidden>0</span></button>
+    </div>
+  </header>
+
+  <!-- PRACTICE -->
+  <section id="viewPractice" class="grid">
+    <div class="panel">
+      <div id="dropZone" class="drop">
+        <h2>先放一支影片進來</h2>
+        <div class="urlrow">
+          <input id="ytUrl" type="url" placeholder="貼上 YouTube 或 Shorts 連結" aria-label="YouTube 連結">
+          <button class="btn primary" id="ytGo">開啟</button>
+        </div>
+        <p class="err" id="ytErr" hidden></p>
+        <span class="or">或</span>
+        <label class="btn">選擇裝置上的影片<input id="fileIn" type="file" accept="video/*,audio/*"></label>
+        <ol>
+          <li>播放時聽到想學的句子，按「A 開始」，說完按「B 結束」。</li>
+          <li>按「存成句子」，就能單獨循環、跟讀、錄音對比。</li>
+        </ol>
+        <div id="recentWrap" hidden>
+          <p class="hint">最近練過的影片</p>
+          <div id="recent" class="recent"></div>
+        </div>
+      </div>
+
+      <div id="playerWrap" hidden>
+        <div class="videobox">
+          <video id="vid" playsinline preload="auto"></video>
+          <div id="ytBox" hidden><div id="ytPlayer"></div></div>
+        </div>
+      </div>
+
+      <div id="controls" hidden>
+        <div class="row" style="justify-content:space-between">
+          <div class="row">
+            <button class="btn" id="back2">⟲ 2 秒</button>
+            <button class="btn primary" id="playBtn">播放</button>
+            <button class="btn" id="fwd2">2 秒 ⟳</button>
+          </div>
+          <div class="row">
+            <span class="time" id="clock">0:00.0 / 0:00.0</span>
+            <select id="speed" aria-label="播放速度">
+              <option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1" selected>1×</option>
+            </select>
+          </div>
+        </div>
+        <p class="hint" id="ytTip" hidden style="margin-top:8px">在 iPad 上如果按「播放」沒反應，先直接點一下影片畫面播放，之後按鈕就能用了。</p>
+        <div class="marks" style="margin-top:10px">
+          <button class="btn" id="markA">A 開始</button>
+          <span class="time" id="aTime">--</span>
+          <button class="btn" id="markB">B 結束</button>
+          <span class="time" id="bTime">--</span>
+          <button class="btn primary" id="addSeg" disabled>存成句子</button>
+        </div>
+        <div class="row" style="margin-top:10px;justify-content:space-between">
+          <span class="hint" id="vidName"></span>
+          <button class="btn small ghost" id="changeVid">換一支影片</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <h2>句子</h2>
+        <span class="hint" id="segCount"></span>
+      </div>
+      <div id="segList" class="seglist"></div>
+
+      <div id="editor" class="seg-editor" hidden>
+        <div class="status" id="status" aria-live="polite"></div>
+        <div>
+          <p class="hint" style="margin-bottom:6px">練法</p>
+          <div class="modes" id="modes">
+            <button class="btn small" data-mode="loop" aria-pressed="true">一直循環</button>
+            <button class="btn small" data-mode="echo" aria-pressed="false">跟讀：播完停下來換我說</button>
+            <button class="btn small" data-mode="once" aria-pressed="false">只播一次</button>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="playSeg">▶ 播這句</button>
+          <label class="hint" for="repeatN">播</label>
+          <select id="repeatN"><option value="0">不限</option><option value="3">3</option><option value="5" selected>5</option><option value="10">10</option></select>
+          <span class="hint">遍後停</span>
+        </div>
+
+        <div class="take">
+          <div class="row">
+            <button class="btn rec" id="recBtn">● 錄我的聲音</button>
+            <label class="btn" id="camLabel">📷 用相機錄<input id="takeFile" type="file" accept="video/*,audio/*" capture="user"></label>
+            <button class="btn" id="compareBtn" disabled>原音 → 我的 對比</button>
+          </div>
+          <p class="hint" id="recHint"></p>
+          <div id="takeBox"></div>
+        </div>
+
+        <div>
+          <label class="hint" for="segText">這句說了什麼（英文）</label>
+          <textarea id="segText" placeholder="例：I'm gonna grab a coffee, you want anything?"></textarea>
+        </div>
+        <div>
+          <label class="hint" for="segNote">筆記（意思、連音、語調）</label>
+          <input type="text" id="segNote" style="width:100%" placeholder="例：gonna = going to；want anything 連在一起">
+        </div>
+        <div class="nudge">
+          <span class="hint">開始</span>
+          <button class="btn small" data-nudge="start:-0.2">−0.2</button>
+          <span class="time" id="sTime"></span>
+          <button class="btn small" data-nudge="start:0.2">+0.2</button>
+          <span class="hint" style="margin-left:8px">結束</span>
+          <button class="btn small" data-nudge="end:-0.2">−0.2</button>
+          <span class="time" id="eTime"></span>
+          <button class="btn small" data-nudge="end:0.2">+0.2</button>
+        </div>
+        <div class="row" style="justify-content:space-between">
+          <button class="btn primary" id="toCard">＋ 存成複習卡</button>
+          <div class="row">
+            <button class="btn ghost" id="unselect">自由播放</button>
+            <button class="btn ghost" id="delSeg">刪除這句</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CARDS -->
+  <section id="viewCards" class="panel" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h2 id="cardsHead">今天要複習</h2>
+      <div class="row">
+        <button class="btn small" id="showDue" aria-pressed="true">今天到期</button>
+        <button class="btn small" id="showAll" aria-pressed="false">全部</button>
+      </div>
+    </div>
+    <p class="hint">先看中文筆記試著說出來，再按「看句子」對答案。記得的會越隔越久才再出現（1、3、7、14、30 天）。</p>
+    <div id="cardList" class="cards"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+const KEY='shadowing.v1';
+const STEPS=[1,3,7,14,30];
+const $=s=>document.querySelector(s);
+const vid=$('#vid');
+let store=load();
+let cur=null;          // {key,name}
+let A=null,B=null;
+let activeId=null, mode='loop', repsDone=0, waitTimer=null, compareStage=null, guardUntil=0;
+const takes={};        // segId -> {url,isVideo}
+let recorder=null, recChunks=[], recStream=null;
+let cardFilter='due';
+
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.videos&&s.cards)return s}catch(e){}return{videos:{},cards:[]}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(store))}catch(e){}}
+const fmt=t=>{if(t==null||isNaN(t))return'--';const m=Math.floor(t/60),s=(t%60);return m+':'+(s<10?'0':'')+s.toFixed(1)};
+const uid=()=>Math.random().toString(36).slice(2,10);
+const today=()=>{const d=new Date();d.setHours(0,0,0,0);return d.getTime()};
+const DAY=864e5;
+
+/* ---------- one player interface for local video and YouTube ---------- */
+const html5={
+  get t(){return vid.currentTime},get dur(){return vid.duration},get paused(){return vid.paused},
+  play(){const p=vid.play();if(p&&p.catch)p.catch(()=>{})},pause(){vid.pause()},seek(t){vid.currentTime=t},rate(r){vid.playbackRate=r},get r(){return vid.playbackRate}
+};
+let ytp=null,ytState=-1,ytReadyP=null;
+const yt={
+  get t(){try{return ytp.getCurrentTime()||0}catch(e){return 0}},get dur(){try{return ytp.getDuration()||NaN}catch(e){return NaN}},
+  get paused(){return ytState!==1&&ytState!==3},
+  play(){try{ytp.playVideo()}catch(e){}},pause(){try{ytp.pauseVideo()}catch(e){}},seek(t){try{ytp.seekTo(t,true)}catch(e){}},
+  rate(r){try{ytp.setPlaybackRate(r)}catch(e){}},get r(){try{return ytp.getPlaybackRate()||1}catch(e){return 1}}
+};
+let P=html5;
+function seek(t){P.seek(t);guardUntil=performance.now()+350}
+function updatePlayBtn(){$('#playBtn').textContent=P.paused?'播放':'暫停'}
+vid.onplay=vid.onpause=updatePlayBtn;
+
+/* ---------- IndexedDB: keep recent local videos on this device ---------- */
+function idb(){return new Promise((res,rej)=>{if(!window.indexedDB)return rej();const r=indexedDB.open('shadowing',1);r.onupgradeneeded=()=>r.result.createObjectStore('videos');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function idbPut(k,v){try{const db=await idb();await new Promise((res,rej)=>{const tx=db.transaction('videos','readwrite');tx.objectStore('videos').put(v,k);tx.oncomplete=res;tx.onerror=rej})}catch(e){}}
+async function idbGet(k){try{const db=await idb();return await new Promise((res)=>{const r=db.transaction('videos').objectStore('videos').get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)})}catch(e){return null}}
+async function idbDel(k){try{const db=await idb();db.transaction('videos','readwrite').objectStore('videos').delete(k)}catch(e){}}
+
+/* ---------- tabs ---------- */
+function showTab(t){
+  $('#tabPractice').setAttribute('aria-selected',t==='p');$('#tabCards').setAttribute('aria-selected',t==='c');
+  $('#viewPractice').hidden=t!=='p';$('#viewCards').hidden=t!=='c';
+  if(t==='c')renderCards();
+}
+$('#tabPractice').onclick=()=>showTab('p');$('#tabCards').onclick=()=>showTab('c');
+
+/* ---------- opening a video ---------- */
+function enterPlayer(key,name){
+  if(!store.videos[key])store.videos[key]={name,segments:[]};
+  store.videos[key].opened=Date.now();save();
+  cur={key,name:store.videos[key].name||name};
+  A=B=null;activeId=null;clearWait();compareStage=null;
+  $('#dropZone').hidden=true;$('#playerWrap').hidden=false;$('#controls').hidden=false;
+  $('#vidName').textContent=cur.name;
+  renderMarks();renderSegs();renderEditor();updatePlayBtn();
+}
+$('#fileIn').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)openFile(f,true)};
+async function openFile(file,persist){
+  yt.pause();$('#ytBox').hidden=true;vid.hidden=false;$('#ytTip').hidden=true;P=html5;
+  const key=file.name+'|'+file.size;
+  if(vid.src)URL.revokeObjectURL(vid.src);
+  vid.src=URL.createObjectURL(file);vid.playbackRate=+$('#speed').value;
+  enterPlayer(key,file.name);
+  if(persist){await idbPut(key,file);store.videos[key].stored=true;save();pruneVideos()}
+}
+async function pruneVideos(){
+  const keys=Object.keys(store.videos).filter(k=>store.videos[k].stored).sort((a,b)=>(store.videos[b].opened||0)-(store.videos[a].opened||0));
+  for(const k of keys.slice(6)){await idbDel(k);store.videos[k].stored=false}
+  save();
+}
+$('#changeVid').onclick=()=>{P.pause();clearWait();$('#dropZone').hidden=false;$('#playerWrap').hidden=true;$('#controls').hidden=true;cur=null;activeId=null;renderSegs();renderEditor();renderRecent()};
+
+/* YouTube */
+function parseYT(u){
+  u=(u||'').trim();if(/^[\w-]{11}$/.test(u))return{id:u,short:false};
+  let url;try{url=new URL(u)}catch(e){return null}
+  const h=url.hostname.replace(/^www\.|^m\./,'');let id=null,short=false;
+  if(h==='youtu.be')id=url.pathname.slice(1,12);
+  else if(/youtube\.com$/.test(h)){
+    if(url.pathname==='/watch')id=url.searchParams.get('v');
+    else{const m=url.pathname.match(/^\/(shorts|embed|live|v)\/([\w-]{11})/);if(m){id=m[2];short=m[1]==='shorts'}}
+  }
+  return id&&/^[\w-]{11}$/.test(id)?{id,short}:null;
+}
+function loadYTApi(){
+  if(window.YT&&YT.Player)return Promise.resolve();
+  if(ytReadyP)return ytReadyP;
+  ytReadyP=new Promise((res,rej)=>{
+    const prev=window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady=()=>{if(prev)try{prev()}catch(e){};res()};
+    const s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';
+    s.onerror=()=>{ytReadyP=null;rej()};document.head.appendChild(s);
+    setTimeout(()=>{if(!(window.YT&&YT.Player)){ytReadyP=null;rej()}},8000);
+  });
+  return ytReadyP;
+}
+function ytError(msg){const e=$('#ytErr');e.textContent=msg;e.hidden=false}
+$('#ytGo').onclick=()=>{const p=parseYT($('#ytUrl').value);if(!p){ytError('看不懂這個連結。請貼 YouTube 影片或 Shorts 的網址，例如 https://youtube.com/shorts/…');return}openYT(p.id,p.short)};
+$('#ytUrl').onkeydown=e=>{if(e.key==='Enter')$('#ytGo').click()};
+async function openYT(id,short){
+  $('#ytErr').hidden=true;
+  try{await loadYTApi()}catch(e){
+    ytError('這個頁面載入不了 YouTube 播放器。在 claude.ai 裡開啟時會被擋下，請改用網站版的網址開這個練習室。');return}
+  vid.pause();vid.hidden=true;$('#ytBox').hidden=false;$('#ytBox').classList.toggle('short',!!short);$('#ytTip').hidden=false;
+  P=yt;const key='yt:'+id;
+  enterPlayer(key,short?'YouTube Shorts':'YouTube 影片');
+  Object.assign(store.videos[key],{yt:id,short:!!short});save();
+  if(!ytp){
+    const vars={playsinline:1,rel:0,modestbranding:1,controls:1};
+    if(location.protocol==='https:')vars.origin=location.origin;
+    ytp=new YT.Player('ytPlayer',{videoId:id,playerVars:vars,events:{
+      onReady:()=>{yt.rate(+$('#speed').value);grabTitle(key)},
+      onStateChange:e=>{ytState=e.data;updatePlayBtn();if(e.data===1)grabTitle(cur&&cur.key)},
+      onError:e=>{setStatus('');const why={2:'連結有誤',5:'這支影片無法在這裡播放',100:'影片不存在或已設為私人',101:'影片擁有者不允許嵌入播放',150:'影片擁有者不允許嵌入播放'}[e.data]||'無法播放';$('#vidName').textContent='⚠ '+why+'，換一支試試。'}
+    }});
+  }else{ytState=-1;ytp.cueVideoById(id);yt.rate(+$('#speed').value)}
+}
+function grabTitle(key){try{const d=ytp.getVideoData();if(d&&d.title&&key&&store.videos[key]&&store.videos[key].name!==d.title){store.videos[key].name=d.title;save();if(cur&&cur.key===key){cur.name=d.title;$('#vidName').textContent=d.title}}}catch(e){}}
+
+function renderRecent(){
+  const keys=Object.keys(store.videos).filter(k=>store.videos[k].stored||store.videos[k].yt).sort((a,b)=>(store.videos[b].opened||0)-(store.videos[a].opened||0)).slice(0,8);
+  $('#recentWrap').hidden=!keys.length;const box=$('#recent');box.textContent='';
+  keys.forEach(k=>{const b=document.createElement('button');b.className='btn small';
+    const v=store.videos[k];b.textContent=(v.yt?'▶ ':'')+v.name+'（'+v.segments.length+' 句）';
+    b.onclick=()=>openKey(k);box.appendChild(b)});
+}
+async function openKey(k){
+  const v=store.videos[k];if(!v)return false;
+  if(v.yt){await openYT(v.yt,v.short);return cur&&cur.key===k}
+  const blob=await idbGet(k);
+  if(blob){await openFile(blob instanceof File?blob:new File([blob],v.name),false);return true}
+  v.stored=false;save();renderRecent();ytError('「'+v.name+'」已經不在這台裝置上了，請重新選擇。');return false;
+}
+
+/* ---------- transport ---------- */
+$('#playBtn').onclick=()=>{clearWait();compareStage=null;if(P.paused)P.play();else P.pause()};
+$('#back2').onclick=()=>seek(Math.max(0,P.t-2));
+$('#fwd2').onclick=()=>seek(Math.min(P.dur||0,P.t+2));
+$('#speed').onchange=e=>P.rate(+e.target.value);
+$('#markA').onclick=()=>{A=P.t;if(B!=null&&B<=A)B=null;renderMarks()};
+$('#markB').onclick=()=>{B=P.t;if(A!=null&&B<=A)A=null;renderMarks();if(A!=null)P.pause()};
+function renderMarks(){$('#aTime').textContent=fmt(A);$('#bTime').textContent=fmt(B);$('#addSeg').disabled=!(A!=null&&B!=null&&B>A)}
+$('#addSeg').onclick=()=>{
+  const list=store.videos[cur.key].segments;
+  const s={id:uid(),start:+A.toFixed(2),end:+B.toFixed(2),text:'',note:'',plays:0,recs:0};
+  list.push(s);list.sort((a,b)=>a.start-b.start);save();
+  A=B=null;renderMarks();select(s.id);
+};
+
+/* ---------- segments ---------- */
+function segs(){return cur?store.videos[cur.key].segments:[]}
+function seg(){return segs().find(s=>s.id===activeId)}
+function renderSegs(){
+  const box=$('#segList');box.textContent='';const list=segs();
+  $('#segCount').textContent=list.length?list.length+' 句':'';
+  if(!list.length){const p=document.createElement('p');p.className='empty-note';p.textContent=cur?'還沒有句子。播放影片，聽到想學的句子時按「A 開始」，說完按「B 結束」，再按「存成句子」。':'還沒有句子。貼上 YouTube 連結或選一支影片，用 A / B 把一句話框起來。';box.appendChild(p);return}
+  list.forEach((s,i)=>{
+    const b=document.createElement('button');b.className='seg';b.setAttribute('aria-current',s.id===activeId);
+    const n=document.createElement('span');n.className='n';n.textContent=i+1;
+    const t=document.createElement('span');t.className='t'+(s.text?'':' empty');t.textContent=s.text||'（還沒填句子）';
+    const m=document.createElement('span');m.className='meta';m.textContent=fmt(s.start)+'–'+fmt(s.end);
+    const m2=document.createElement('div');m2.textContent='聽 '+s.plays+'・錄 '+s.recs;m.appendChild(m2);
+    b.append(n,t,m);b.onclick=()=>select(s.id);box.appendChild(b);
+  });
+}
+function select(id){activeId=id;repsDone=0;clearWait();compareStage=null;renderSegs();renderEditor();const s=seg();if(s){P.pause();seek(s.start)}}
+function renderEditor(){
+  const s=seg();$('#editor').hidden=!s;if(!s)return;
+  $('#segText').value=s.text;$('#segNote').value=s.note||'';
+  $('#sTime').textContent=fmt(s.start);$('#eTime').textContent=fmt(s.end);
+  renderTake();setStatus('');
+}
+$('#segText').oninput=e=>{const s=seg();if(s){s.text=e.target.value;save();renderSegsLight()}};
+$('#segNote').oninput=e=>{const s=seg();if(s){s.note=e.target.value;save()}};
+let segT=null;function renderSegsLight(){clearTimeout(segT);segT=setTimeout(renderSegs,300)}
+document.querySelectorAll('[data-nudge]').forEach(b=>b.onclick=()=>{
+  const s=seg();if(!s)return;const[k,d]=b.dataset.nudge.split(':');
+  s[k]=Math.max(0,+(s[k]+ +d).toFixed(2));
+  if(s.end<=s.start+0.2){if(k==='start')s.start=+(s.end-0.2).toFixed(2);else s.end=+(s.start+0.2).toFixed(2)}
+  save();renderEditor();renderSegs();seek(k==='start'?s.start:Math.max(s.start,s.end-1.5));
+});
+$('#modes').onclick=e=>{const b=e.target.closest('button');if(!b)return;mode=b.dataset.mode;
+  document.querySelectorAll('#modes button').forEach(x=>x.setAttribute('aria-pressed',x===b))};
+$('#playSeg').onclick=()=>{const s=seg();if(!s)return;clearWait();compareStage=null;repsDone=0;seek(s.start);P.play();setStatus('')};
+$('#unselect').onclick=()=>{activeId=null;clearWait();renderSegs();renderEditor()};
+let delArmed=false;
+$('#delSeg').onclick=()=>{
+  const btn=$('#delSeg');
+  if(!delArmed){delArmed=true;btn.textContent='再按一次確定刪除';btn.style.color='var(--rec)';setTimeout(()=>{delArmed=false;btn.textContent='刪除這句';btn.style.color=''},3000);return}
+  delArmed=false;const list=segs();const i=list.findIndex(s=>s.id===activeId);if(i>=0)list.splice(i,1);save();activeId=null;
+  btn.textContent='刪除這句';btn.style.color='';renderSegs();renderEditor();
+};
+function setStatus(t,turn){const el=$('#status');el.textContent=t;el.className='status'+(turn?' turn':'')}
+function clearWait(){if(waitTimer){clearInterval(waitTimer);waitTimer=null}}
+
+/* precise segment looping */
+function tick(){
+  if(cur){$('#clock').textContent=fmt(P.t)+' / '+fmt(P.dur)}
+  const s=seg();
+  if(s&&!P.paused&&performance.now()>guardUntil&&P.t>=s.end)onSegEnd(s);
+  requestAnimationFrame(tick);
+}
+function onSegEnd(s){
+  if(compareStage==='orig'){P.pause();seek(s.start);compareStage=null;const el=$('#takeBox').querySelector('audio,video');if(el){el.currentTime=0;el.play();setStatus('現在播你的錄音')}return}
+  s.plays++;repsDone++;save();renderSegsLight();
+  const target=+$('#repeatN').value;
+  if(mode==='once'||(target&&repsDone>=target)){P.pause();seek(s.start);setStatus(mode==='once'?'播完了':'完成 '+repsDone+' 遍 👏');repsDone=0;return}
+  if(mode==='echo'){
+    P.pause();seek(s.start);
+    let left=Math.ceil((s.end-s.start)/(P.r||1)*1.3+0.8);
+    setStatus('換你說…（'+left+'）',true);
+    waitTimer=setInterval(()=>{left--;if(left<=0){clearWait();setStatus('');seek(s.start);P.play()}else setStatus('換你說…（'+left+'）',true)},1000);
+  }else{seek(s.start);setStatus('第 '+(repsDone+1)+' 遍')}
+}
+requestAnimationFrame(tick);
+
+/* ---------- recording ---------- */
+const canMic=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
+let micBlocked=!canMic;
+function updateRecUI(){
+  $('#recBtn').hidden=micBlocked;
+  $('#recHint').textContent=micBlocked
+    ?'這個頁面不能直接開麥克風，改按「用相機錄」：會打開前鏡頭錄一段，錄完自動放在下面跟原音比。'
+    :'戴耳機，按錄音後再按「播這句」，跟著影片同時說（影子跟讀）。也可以聽完再自己說一次。';
+}
+updateRecUI();
+$('#recBtn').onclick=async()=>{
+  if(recorder&&recorder.state==='recording'){recorder.stop();return}
+  try{recStream=await navigator.mediaDevices.getUserMedia({audio:true})}
+  catch(e){micBlocked=true;updateRecUI();setStatus('沒辦法開麥克風，請改用「用相機錄」。');return}
+  recChunks=[];recorder=new MediaRecorder(recStream);
+  recorder.ondataavailable=ev=>{if(ev.data.size)recChunks.push(ev.data)};
+  recorder.onstop=()=>{
+    recStream.getTracks().forEach(t=>t.stop());
+    setTake(new Blob(recChunks,{type:recorder.mimeType||'audio/webm'}),false);
+    $('#recBtn').classList.remove('on');$('#recBtn').textContent='● 錄我的聲音';
+  };
+  recorder.start();$('#recBtn').classList.add('on');$('#recBtn').textContent='■ 停止錄音';setStatus('錄音中…');
+};
+$('#takeFile').onchange=e=>{const f=e.target.files[0];e.target.value='';if(f)setTake(f,f.type.startsWith('video'))};
+function setTake(blob,isVideo){
+  const s=seg();if(!s)return;
+  if(takes[s.id])URL.revokeObjectURL(takes[s.id].url);
+  takes[s.id]={url:URL.createObjectURL(blob),isVideo};
+  s.recs++;save();renderSegs();renderTake();setStatus('錄好了，按「原音 → 我的 對比」聽聽看差在哪');
+}
+function renderTake(){
+  const s=seg();const box=$('#takeBox');box.textContent='';const t=s&&takes[s.id];
+  $('#compareBtn').disabled=!t;if(!t)return;
+  const el=document.createElement(t.isVideo?'video':'audio');el.controls=true;el.playsInline=true;el.src=t.url;
+  box.appendChild(el);
+  const p=document.createElement('p');p.className='hint';p.textContent='你的錄音只留在這次開啟的頁面裡，重新整理就會消失。';box.appendChild(p);
+}
+$('#compareBtn').onclick=()=>{const s=seg();if(!s)return;clearWait();compareStage='orig';seek(s.start);P.play();setStatus('先播原音…')};
+
+/* ---------- cards ---------- */
+$('#toCard').onclick=()=>{
+  const s=seg();if(!s)return;
+  if(!s.text.trim()){setStatus('先在下面填上這句英文，再存成卡片。',true);$('#segText').focus();return}
+  const ex=store.cards.find(c=>c.segId===s.id);
+  if(ex){ex.text=s.text.trim();ex.note=(s.note||'').trim();save();setStatus('已更新複習卡');updateBadge();return}
+  store.cards.push({id:uid(),segId:s.id,vidKey:cur.key,vidName:cur.name,text:s.text.trim(),note:(s.note||'').trim(),start:s.start,end:s.end,created:Date.now(),due:today()+DAY,step:-1});
+  save();updateBadge();setStatus('存好了，明天會出現在複習卡裡');
+};
+function dueCards(){const t=today();return store.cards.filter(c=>c.due<=t)}
+function updateBadge(){const n=dueCards().length;const b=$('#dueBadge');b.hidden=!n;b.textContent=n}
+$('#showDue').onclick=()=>{cardFilter='due';renderCards()};
+$('#showAll').onclick=()=>{cardFilter='all';renderCards()};
+function renderCards(){
+  $('#showDue').setAttribute('aria-pressed',cardFilter==='due');$('#showAll').setAttribute('aria-pressed',cardFilter==='all');
+  $('#cardsHead').textContent=cardFilter==='due'?'今天要複習':'全部卡片';
+  const box=$('#cardList');box.textContent='';
+  const list=(cardFilter==='due'?dueCards():store.cards.slice()).sort((a,b)=>a.due-b.due);
+  if(!list.length){const p=document.createElement('p');p.className='empty-note';
+    p.textContent=store.cards.length?'今天沒有要複習的卡片 🎉 去練新影片吧。':'還沒有卡片。在練習頁選一句、填上英文，按「存成複習卡」。';box.appendChild(p);return}
+  const t=today();
+  list.forEach(c=>{
+    const d=document.createElement('div');d.className='card';
+    const top=document.createElement('div');top.className='row';top.style.justifyContent='space-between';
+    const pill=document.createElement('span');pill.className='pill '+(c.due<=t?'due':'later');
+    pill.textContent=c.due<=t?'該複習了':Math.round((c.due-t)/DAY)+' 天後';
+    const v=store.videos[c.vidKey];
+    const src=document.createElement('span');src.className='src';src.textContent=(v?v.name:c.vidName)+'・'+fmt(c.start);
+    top.append(pill,src);
+    const note=document.createElement('div');note.className='note';note.textContent=c.note||'（沒有筆記）先回想這句在影片哪裡出現。';
+    const say=document.createElement('div');say.className='say';say.textContent=c.text;
+    const hide=cardFilter==='due'&&c.due<=t;say.hidden=hide;
+    const row=document.createElement('div');row.className='row';
+    const reveal=document.createElement('button');reveal.className='btn';reveal.textContent='看句子';reveal.hidden=!hide;
+    const again=document.createElement('button');again.className='btn';again.textContent='不熟，明天再來';
+    const good=document.createElement('button');good.className='btn primary';
+    const nextStep=Math.min(c.step+1,STEPS.length-1);good.textContent='記得（'+STEPS[nextStep]+' 天後）';
+    const play=document.createElement('button');play.className='btn';play.textContent='▶ 去練這句';
+    const del=document.createElement('button');del.className='btn ghost';del.textContent='刪除';
+    const actions=[again,good];actions.forEach(x=>x.hidden=hide);
+    reveal.onclick=()=>{say.hidden=false;reveal.hidden=true;actions.forEach(x=>x.hidden=false)};
+    again.onclick=()=>{c.step=-1;c.due=t+DAY;save();updateBadge();renderCards()};
+    good.onclick=()=>{c.step=nextStep;c.due=t+STEPS[nextStep]*DAY;save();updateBadge();renderCards()};
+    play.onclick=async()=>{
+      if(!cur||cur.key!==c.vidKey){showTab('p');const ok=await openKey(c.vidKey);if(!ok)return}
+      showTab('p');if(segs().some(s=>s.id===c.segId))select(c.segId);
+    };
+    let armed=false;del.onclick=()=>{if(!armed){armed=true;del.textContent='再按一次確定';del.style.color='var(--rec)';setTimeout(()=>{armed=false;del.textContent='刪除';del.style.color=''},3000);return}
+      store.cards=store.cards.filter(x=>x.id!==c.id);save();updateBadge();renderCards()};
+    row.append(reveal,again,good,play,del);
+    d.append(top,note,say,row);box.appendChild(d);
+  });
+}
+
+/* ---------- keyboard ---------- */
+document.addEventListener('keydown',e=>{
+  if(e.target.matches('input,textarea,select'))return;
+  if(e.code==='Space'&&cur){e.preventDefault();$('#playBtn').click()}
+  else if(e.key==='a'&&cur)$('#markA').click();
+  else if(e.key==='b'&&cur)$('#markB').click();
+  else if(e.key==='r'&&seg())$('#playSeg').click();
+});
+
+renderSegs();renderRecent();updateBadge();
+})();
+</script>
+
+</body>
+</html>
