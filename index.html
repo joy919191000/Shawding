@@ -94,6 +94,15 @@ textarea{width:100%;resize:vertical;min-height:60px}
 .card .src{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
 .pill{display:inline-block;font-size:.75rem;padding:1px 8px;border-radius:99px;border:1px solid currentColor}
 .pill.due{color:var(--rec)} .pill.later{color:var(--ok)}
+.cap{background:var(--accent-soft);border-radius:10px;padding:12px 14px;min-height:3.4em;margin-top:10px;display:flex;flex-direction:column;gap:2px}
+.cap .en{font-size:1.2rem;font-weight:500;line-height:1.4;overflow-wrap:anywhere}
+.cap .zh{color:var(--muted);overflow-wrap:anywhere}
+.seglist{position:relative}
+.seg .zh{display:block;font-size:.85rem;color:var(--muted);font-style:normal}
+.seg.live{border-color:var(--warn)}
+.seg.live .n{color:var(--warn)}
+#importBox{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+#importText{min-height:140px;font-family:var(--mono);font-size:.85rem}
 </style>
 
 <div class="wrap">
@@ -148,6 +157,7 @@ textarea{width:100%;resize:vertical;min-height:60px}
             </select>
           </div>
         </div>
+        <div class="cap" id="capBox" hidden><div class="en" id="capEn"></div><div class="zh" id="capZh"></div></div>
         <p class="hint" id="ytTip" hidden style="margin-top:8px">在 iPad 上如果按「播放」沒反應，先直接點一下影片畫面播放，之後按鈕就能用了。</p>
         <div class="marks" style="margin-top:10px">
           <button class="btn" id="markA">A 開始</button>
@@ -158,7 +168,20 @@ textarea{width:100%;resize:vertical;min-height:60px}
         </div>
         <div class="row" style="margin-top:10px;justify-content:space-between">
           <span class="hint" id="vidName"></span>
-          <button class="btn small ghost" id="changeVid">換一支影片</button>
+          <div class="row">
+            <button class="btn small" id="zhToggle" aria-pressed="true">中文翻譯</button>
+            <button class="btn small" id="importOpen">貼上文字稿</button>
+            <button class="btn small ghost" id="changeVid">換一支影片</button>
+          </div>
+        </div>
+        <div id="importBox" hidden>
+          <p class="hint">在電腦版 YouTube 影片下方按「…更多」→「顯示轉錄稿」，全選複製後貼在這裡。每一行時間會變成一句，可以點來循環。</p>
+          <textarea id="importText" placeholder="0:01&#10;so today I'm going to show you&#10;0:04&#10;how I make my morning coffee"></textarea>
+          <div class="row">
+            <button class="btn primary" id="importGo">匯入</button>
+            <button class="btn ghost" id="importCancel">取消</button>
+            <span class="hint" id="importMsg"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -204,6 +227,10 @@ textarea{width:100%;resize:vertical;min-height:60px}
         <div>
           <label class="hint" for="segNote">筆記（意思、連音、語調）</label>
           <input type="text" id="segNote" style="width:100%" placeholder="例：gonna = going to；want anything 連在一起">
+        </div>
+        <div>
+          <label class="hint" for="segZh">中文翻譯</label>
+          <input type="text" id="segZh" style="width:100%" placeholder="例：我要去買杯咖啡，你要什麼嗎？">
         </div>
         <div class="nudge">
           <span class="hint">開始</span>
@@ -353,6 +380,7 @@ async function openYT(id,short){
   P=yt;const key='yt:'+id;
   enterPlayer(key,short?'YouTube Shorts':'YouTube 影片');
   Object.assign(store.videos[key],{yt:id,short:!!short});save();
+  loadSubs(id,key);
   if(!ytp){
     const vars={playsinline:1,rel:0,modestbranding:1,controls:1};
     if(location.protocol==='https:')vars.origin=location.origin;
@@ -363,6 +391,56 @@ async function openYT(id,short){
     }});
   }else{ytState=-1;ytp.cueVideoById(id);yt.rate(+$('#speed').value)}
 }
+/* ---------- subtitles ---------- */
+let showZh=true, liveId=null;
+async function loadSubs(id,key){
+  const v=store.videos[key];if(!v||v.subsImported)return;
+  try{const r=await fetch('subs/'+id+'.json',{cache:'no-cache'});if(!r.ok)return;const d=await r.json();
+    if(Array.isArray(d.lines)&&importLines(key,d.lines))setStatusSoon('已載入 '+d.lines.length+' 句中英字幕')}catch(e){}
+}
+function setStatusSoon(t){$('#importMsg').textContent=t;setTimeout(()=>{$('#importMsg').textContent=''},4000)}
+function importLines(key,lines,replace){
+  const v=store.videos[key];if(!v||!lines.length)return 0;
+  if(replace)v.segments=v.segments.filter(s=>!s.auto);
+  lines.forEach(l=>{const s=+l.s,e=+l.e;if(isNaN(s)||isNaN(e)||e<=s)return;
+    v.segments.push({id:uid(),start:+s.toFixed(2),end:+e.toFixed(2),text:(l.en||'').trim(),zh:(l.zh||'').trim(),note:'',plays:0,recs:0,auto:true})});
+  v.segments.sort((a,b)=>a.start-b.start);v.subsImported=true;save();
+  if(cur&&cur.key===key){liveId=null;renderSegs();renderCap(null)}
+  return lines.length;
+}
+function parseTranscript(txt){
+  const ts=/^(?:\d{1,2}:)?\d{1,2}:\d{2}$/, inline=/^((?:\d{1,2}:)?\d{1,2}:\d{2})\s+(.+)$/;
+  const spoken=/^(\d+\s*(hours?|minutes?|seconds?|小時|分鐘|秒鐘?)[,，、\s]*)+$/i;
+  const toSec=t=>t.split(':').reduce((a,b)=>a*60+ +b,0);
+  const out=[];let c=null;
+  txt.replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(l=>{
+    let m;if(spoken.test(l))return;
+    if(ts.test(l)){c={s:toSec(l),en:''};out.push(c)}
+    else if((m=l.match(inline))){c={s:toSec(m[1]),en:m[2]};out.push(c)}
+    else if(c)c.en=(c.en?c.en+' ':'')+l;
+  });
+  const res=out.filter(x=>x.en);res.forEach((x,i)=>x.e=res[i+1]?Math.max(res[i+1].s,x.s+0.5):x.s+4);return res;
+}
+$('#importOpen').onclick=()=>{$('#importBox').hidden=!$('#importBox').hidden};
+$('#importCancel').onclick=()=>{$('#importBox').hidden=true};
+$('#importGo').onclick=()=>{
+  if(!cur)return;const lines=parseTranscript($('#importText').value);
+  if(!lines.length){$('#importMsg').textContent='找不到時間標記，請確認貼的是含時間的轉錄稿。';return}
+  importLines(cur.key,lines,true);$('#importText').value='';$('#importBox').hidden=true;setStatusSoon('匯入了 '+lines.length+' 句');
+};
+$('#zhToggle').onclick=()=>{showZh=!showZh;$('#zhToggle').setAttribute('aria-pressed',showZh);renderSegs();liveId=undefined};
+function renderCap(s){
+  const has=segs().some(x=>x.text);$('#capBox').hidden=!has;
+  $('#capEn').textContent=s?s.text:'';$('#capZh').textContent=s&&showZh?(s.zh||''):'';
+}
+function updateLive(){
+  const t=P.t;let L=null;for(const s of segs()){if(t>=s.start&&t<s.end){L=s;break}}
+  const id=L?L.id:null;if(id===liveId)return;liveId=id;renderCap(L);
+  document.querySelectorAll('.seg.live').forEach(e=>e.classList.remove('live'));
+  if(!L)return;const box=$('#segList'),el=box.querySelector('.seg[data-id="'+L.id+'"]');
+  if(el){el.classList.add('live');const top=el.offsetTop-box.scrollTop;if(top<0||top>box.clientHeight-el.offsetHeight)box.scrollTop=el.offsetTop-40}
+}
+
 function grabTitle(key){try{const d=ytp.getVideoData();if(d&&d.title&&key&&store.videos[key]&&store.videos[key].name!==d.title){store.videos[key].name=d.title;save();if(cur&&cur.key===key){cur.name=d.title;$('#vidName').textContent=d.title}}}catch(e){}}
 
 function renderRecent(){
@@ -405,7 +483,9 @@ function renderSegs(){
   list.forEach((s,i)=>{
     const b=document.createElement('button');b.className='seg';b.setAttribute('aria-current',s.id===activeId);
     const n=document.createElement('span');n.className='n';n.textContent=i+1;
+    b.dataset.id=s.id;
     const t=document.createElement('span');t.className='t'+(s.text?'':' empty');t.textContent=s.text||'（還沒填句子）';
+    if(showZh&&s.zh){const z=document.createElement('span');z.className='zh';z.textContent=s.zh;t.appendChild(z)}
     const m=document.createElement('span');m.className='meta';m.textContent=fmt(s.start)+'–'+fmt(s.end);
     const m2=document.createElement('div');m2.textContent='聽 '+s.plays+'・錄 '+s.recs;m.appendChild(m2);
     b.append(n,t,m);b.onclick=()=>select(s.id);box.appendChild(b);
@@ -414,12 +494,13 @@ function renderSegs(){
 function select(id){activeId=id;repsDone=0;clearWait();compareStage=null;renderSegs();renderEditor();const s=seg();if(s){P.pause();seek(s.start)}}
 function renderEditor(){
   const s=seg();$('#editor').hidden=!s;if(!s)return;
-  $('#segText').value=s.text;$('#segNote').value=s.note||'';
+  $('#segText').value=s.text;$('#segNote').value=s.note||'';$('#segZh').value=s.zh||'';
   $('#sTime').textContent=fmt(s.start);$('#eTime').textContent=fmt(s.end);
   renderTake();setStatus('');
 }
 $('#segText').oninput=e=>{const s=seg();if(s){s.text=e.target.value;save();renderSegsLight()}};
 $('#segNote').oninput=e=>{const s=seg();if(s){s.note=e.target.value;save()}};
+$('#segZh').oninput=e=>{const s=seg();if(s){s.zh=e.target.value;save();renderSegsLight();liveId=undefined}};
 let segT=null;function renderSegsLight(){clearTimeout(segT);segT=setTimeout(renderSegs,300)}
 document.querySelectorAll('[data-nudge]').forEach(b=>b.onclick=()=>{
   const s=seg();if(!s)return;const[k,d]=b.dataset.nudge.split(':');
@@ -443,7 +524,7 @@ function clearWait(){if(waitTimer){clearInterval(waitTimer);waitTimer=null}}
 
 /* precise segment looping */
 function tick(){
-  if(cur){$('#clock').textContent=fmt(P.t)+' / '+fmt(P.dur)}
+  if(cur){$('#clock').textContent=fmt(P.t)+' / '+fmt(P.dur);updateLive()}
   const s=seg();
   if(s&&!P.paused&&performance.now()>guardUntil&&P.t>=s.end)onSegEnd(s);
   requestAnimationFrame(tick);
@@ -507,7 +588,7 @@ $('#toCard').onclick=()=>{
   if(!s.text.trim()){setStatus('先在下面填上這句英文，再存成卡片。',true);$('#segText').focus();return}
   const ex=store.cards.find(c=>c.segId===s.id);
   if(ex){ex.text=s.text.trim();ex.note=(s.note||'').trim();save();setStatus('已更新複習卡');updateBadge();return}
-  store.cards.push({id:uid(),segId:s.id,vidKey:cur.key,vidName:cur.name,text:s.text.trim(),note:(s.note||'').trim(),start:s.start,end:s.end,created:Date.now(),due:today()+DAY,step:-1});
+  store.cards.push({id:uid(),segId:s.id,vidKey:cur.key,vidName:cur.name,text:s.text.trim(),note:(s.note||s.zh||'').trim(),start:s.start,end:s.end,created:Date.now(),due:today()+DAY,step:-1});
   save();updateBadge();setStatus('存好了，明天會出現在複習卡裡');
 };
 function dueCards(){const t=today();return store.cards.filter(c=>c.due<=t)}
