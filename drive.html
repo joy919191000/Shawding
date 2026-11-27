@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>開車跟讀</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one column, everything thumb-sized; the running screen is two giant zones (status on top, STOP below) */
+:root{
+  --bg:#f3f5f7; --panel:#ffffff; --ink:#18232e; --muted:#5d6b78; --line:#d9e0e6;
+  --accent:#1d5fa8; --accent-soft:#e3edf8; --rec:#c8323b; --ok:#2f7d4f; --warn:#a86a10;
+  --display:"Space Grotesk","Noto Sans TC",system-ui,sans-serif;
+  --body:"Noto Sans TC",system-ui,-apple-system,"PingFang TC",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0e1317; --panel:#182027; --ink:#e8eef3; --muted:#9aa8b5; --line:#2b3540;
+  --accent:#6aa8ec; --accent-soft:#1d2e42; --rec:#ef6a70; --ok:#6cc48f; --warn:#e9ad52; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:calc(env(safe-area-inset-top,0px) + 12px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 24px)}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-size:1.5rem;margin:0}
+h2{font-family:var(--display);font-size:1.05rem;margin:0}
+a{color:var(--accent)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.hint{font-size:.88rem;color:var(--muted);margin:0}
+.opt{display:flex;flex-direction:column;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:99px;padding:8px 14px;min-height:44px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500}
+.chip[disabled]{opacity:.4}
+.btn{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:10px 16px;min-height:44px;cursor:pointer}
+.btn:focus-visible,.chip:focus-visible,.giant:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.giant{font-family:var(--display);font-weight:700;border:0;border-radius:24px;width:100%;color:#fff;cursor:pointer;letter-spacing:.04em}
+#startBtn{background:var(--accent);font-size:2.6rem;min-height:38vh}
+#stopBtn{background:var(--rec);font-size:2.4rem;min-height:30vh}
+#skipBtn{width:100%;font-size:1.2rem;min-height:64px}
+.stage{display:flex;flex-direction:column;gap:12px;align-items:stretch;text-align:center}
+.phase{font-family:var(--display);font-weight:700;font-size:3rem;line-height:1.1;padding:24px 12px;border-radius:20px;background:var(--accent-soft);color:var(--accent)}
+.phase.rec{background:var(--rec);color:#fff}
+.phase.recall{color:var(--warn)}
+.phase.compare{color:var(--ok)}
+.en{font-size:1.5rem;font-weight:500;overflow-wrap:anywhere}
+.zh{color:var(--muted);font-size:1.05rem}
+.meta{color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums}
+.result audio{width:100%}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.hist{display:flex;flex-direction:column;gap:10px}
+.hitem{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.hitem audio{width:100%}
+.err{color:var(--rec);font-weight:500;margin:0}
+.safety{font-size:.85rem;color:var(--muted);border-left:0;background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>開車跟讀</h1>
+    <a href="./">← 回練習室</a>
+  </header>
+
+  <!-- SETUP -->
+  <section id="setup" class="panel">
+    <div class="opt">
+      <h2>練什麼</h2>
+      <div class="chips" id="sources">
+        <button class="chip" data-src="lib" aria-pressed="true">生活口語 <span id="nLib"></span></button>
+        <button class="chip" data-src="cards" aria-pressed="false">我的複習卡 <span id="nCards"></span></button>
+        <button class="chip" data-src="segs" aria-pressed="false">我影片裡的句子 <span id="nSegs"></span></button>
+      </div>
+    </div>
+    <div class="opt">
+      <h2>回想時間</h2>
+      <div class="chips" id="recallOpt">
+        <button class="chip" data-v="3" aria-pressed="false">3 秒</button>
+        <button class="chip" data-v="5" aria-pressed="true">5 秒</button>
+        <button class="chip" data-v="8" aria-pressed="false">8 秒</button>
+      </div>
+    </div>
+    <div class="opt">
+      <h2>語速</h2>
+      <div class="chips" id="rateOpt">
+        <button class="chip" data-v="0.8" aria-pressed="false">慢</button>
+        <button class="chip" data-v="0.95" aria-pressed="true">正常</button>
+        <button class="chip" data-v="1.1" aria-pressed="false">快</button>
+      </div>
+    </div>
+    <p class="hint">每一句：播英文 → 安靜回想 → 「嗶」一聲開始錄你說（原句的 1.5 倍長）→ 「嗶」結束 → 再播原句和你的錄音 → 下一句。一直重複到你按停止，整段會存成一個錄音檔。</p>
+    <p class="safety">出發前先按開始，把手機固定好再上路。開車時不用看螢幕，聽「嗶」聲就知道輪到你。</p>
+    <p class="err" id="setupErr" hidden></p>
+  </section>
+  <button class="giant" id="startBtn">開始</button>
+
+  <!-- RUNNING -->
+  <section id="running" class="stage" hidden>
+    <div class="phase" id="phase">準備中</div>
+    <div class="en" id="curEn"></div>
+    <div class="zh" id="curZh"></div>
+    <div class="meta" id="runMeta"></div>
+    <button class="giant" id="stopBtn">停止</button>
+    <button class="btn" id="skipBtn">跳過這句</button>
+  </section>
+
+  <!-- RESULT -->
+  <section id="result" class="panel result" hidden>
+    <h2>這次的學習錄音</h2>
+    <p class="meta" id="resMeta"></p>
+    <audio id="resAudio" controls playsinline></audio>
+    <div class="row">
+      <button class="btn" id="resShare">分享／存到檔案</button>
+      <a class="btn" id="resDl" download>下載</a>
+    </div>
+    <p class="hint">錄音也會留在下面的「之前的紀錄」裡（只存在這台手機）。</p>
+  </section>
+
+  <section class="panel" id="histPanel" hidden>
+    <h2>之前的紀錄</h2>
+    <div class="hist" id="hist"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+
+/* ---------- built-in everyday phrases ---------- */
+const LIB=[
+["Can I get an iced latte, please?","可以給我一杯冰拿鐵嗎？"],
+["For here or to go?","內用還是外帶？"],
+["Could I get that without onions?","那個可以不要加洋蔥嗎？"],
+["I'll have what she's having.","我要跟她一樣的。"],
+["Can we get the check, please?","可以幫我們結帳嗎？"],
+["Do you guys take cards?","你們可以刷卡嗎？"],
+["I'm just looking, thanks.","我只是看看，謝謝。"],
+["Do you have this in a medium?","這件有 M 號嗎？"],
+["Long time no see! How've you been?","好久不見！最近好嗎？"],
+["What have you been up to lately?","你最近在忙什麼？"],
+["I know, right?","對啊，就是說啊！"],
+["That makes sense.","有道理。"],
+["No way, are you serious?","不會吧，你是認真的嗎？"],
+["I'm not gonna lie, I loved it.","老實說，我超愛的。"],
+["It's not a big deal.","沒什麼大不了的。"],
+["I'm so down for that.","我完全可以，算我一份。"],
+["Let me think about it and get back to you.","我想一下再回覆你。"],
+["Sorry, I didn't catch that.","抱歉，我剛剛沒聽清楚。"],
+["What do you mean by that?","你那是什麼意思？"],
+["That sounds like a plan.","就這麼辦。"],
+["I'm running a little late.","我會晚一點到。"],
+["No worries, take your time.","沒關係，慢慢來。"],
+["It was nice catching up with you.","很高興跟你聊聊近況。"],
+["Let's grab coffee sometime.","改天一起喝咖啡吧。"],
+["I've been meaning to ask you something.","我一直想問你一件事。"],
+["You can say that again.","說得太對了。"],
+["I couldn't agree more.","我完全同意。"],
+["It depends on the day.","要看當天狀況。"],
+["Do you have a minute?","你現在有空嗎？"],
+["Let's circle back on this tomorrow.","這件事我們明天再來討論。"],
+["Could you walk me through it?","可以帶我過一遍嗎？"],
+["I'll keep you posted.","有進度我會再跟你說。"],
+["Just to make sure we're on the same page.","確認一下我們的理解一致。"],
+["Can we push the meeting to Thursday?","會議可以改到星期四嗎？"],
+["I'm swamped right now.","我現在忙翻了。"],
+["Let me double-check and get back to you.","我再確認一下回覆你。"],
+["That works for me.","我可以，沒問題。"],
+["Thanks for the heads-up.","謝謝你先提醒我。"],
+["Sorry for the delay in getting back to you.","抱歉這麼晚回覆你。"],
+["What's the deadline on this?","這個的截止日是什麼時候？"],
+["I'm heading out now.","我要出門了。"],
+["Traffic was crazy this morning.","今天早上塞車塞爆了。"],
+["I'm starving, let's eat.","我快餓死了，去吃飯吧。"],
+["I didn't sleep well last night.","我昨晚沒睡好。"],
+["Can you give me a hand with this?","可以幫我一下嗎？"],
+["I'll be right back.","我馬上回來。"],
+["It's up to you.","你決定就好。"],
+["I'm off tomorrow.","我明天休假。"],
+["Let me know when you get home.","到家跟我說一聲。"],
+["Don't worry about it.","別在意，沒關係。"]
+].map(([en,zh])=>({en,zh}));
+
+/* ---------- user's own sentences from the practice page ---------- */
+let saved={videos:{},cards:[]};
+try{const s=JSON.parse(localStorage.getItem('shadowing.v1'));if(s&&s.videos&&s.cards)saved=s}catch(e){}
+const CARDS=saved.cards.filter(c=>c.text).map(c=>({en:c.text,zh:c.note||''}));
+const SEGS=[];Object.values(saved.videos).forEach(v=>(v.segments||[]).forEach(s=>{if(s.text&&s.text.trim())SEGS.push({en:s.text.trim(),zh:s.zh||''})}));
+const POOLS={lib:LIB,cards:CARDS,segs:SEGS};
+$('#nLib').textContent=LIB.length;$('#nCards').textContent=CARDS.length;$('#nSegs').textContent=SEGS.length;
+
+/* ---------- settings (remembered) ---------- */
+let prefs={src:['lib'],recall:5,rate:0.95};
+try{Object.assign(prefs,JSON.parse(localStorage.getItem('drive.prefs'))||{})}catch(e){}
+function savePrefs(){try{localStorage.setItem('drive.prefs',JSON.stringify(prefs))}catch(e){}}
+function syncChips(){
+  document.querySelectorAll('#sources .chip').forEach(c=>{const k=c.dataset.src;c.disabled=!POOLS[k].length;c.setAttribute('aria-pressed',prefs.src.includes(k)&&POOLS[k].length>0)});
+  document.querySelectorAll('#recallOpt .chip').forEach(c=>c.setAttribute('aria-pressed',+c.dataset.v===prefs.recall));
+  document.querySelectorAll('#rateOpt .chip').forEach(c=>c.setAttribute('aria-pressed',+c.dataset.v===prefs.rate));
+}
+$('#sources').onclick=e=>{const c=e.target.closest('.chip');if(!c||c.disabled)return;const k=c.dataset.src;
+  prefs.src=prefs.src.includes(k)?prefs.src.filter(x=>x!==k):[...prefs.src,k];savePrefs();syncChips()};
+$('#recallOpt').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;prefs.recall=+c.dataset.v;savePrefs();syncChips()};
+$('#rateOpt').onclick=e=>{const c=e.target.closest('.chip');if(!c)return;prefs.rate=+c.dataset.v;savePrefs();syncChips()};
+syncChips();
+
+/* ---------- audio plumbing ---------- */
+let ctx=null, stream=null, voice=null, wakeLock=null;
+function pickVoice(){
+  const vs=speechSynthesis.getVoices().filter(v=>/^en[-_]US/i.test(v.lang));
+  voice=vs.find(v=>/Samantha|Ava|Google US English|Aria|Jenny/i.test(v.name))||vs.find(v=>v.localService)||vs[0]||null;
+}
+if('speechSynthesis' in window){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}
+function beep(freq,ms){return new Promise(res=>{try{const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=freq;o.type='sine';
+  g.gain.setValueAtTime(0.0001,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.5,ctx.currentTime+0.02);g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+ms/1000);
+  o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+ms/1000+0.02);o.onended=res}catch(e){res()}})}
+async function keepAwake(){try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen')}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(run&&document.visibilityState==='visible')keepAwake()});
+
+/* ---------- one session ---------- */
+let run=null;
+function stopped(){return !run||run.stop}
+function cancelable(fn){run.cancel.add(fn);return()=>run&&run.cancel.delete(fn)}
+function sleep(ms){return new Promise(res=>{const t=setTimeout(done,ms);const off=cancelable(done);function done(){clearTimeout(t);off();res()}})}
+function speak(text){
+  return new Promise(res=>{
+    if(!('speechSynthesis' in window))return res(2);
+    const u=new SpeechSynthesisUtterance(text);u.lang='en-US';if(voice)u.voice=voice;u.rate=prefs.rate;
+    const est=Math.max(1.2,text.split(/\s+/).length*0.4/prefs.rate);
+    let t0=0,fin=false;
+    const done=()=>{if(fin)return;fin=true;clearTimeout(fb);off();res(t0?(performance.now()-t0)/1000:est)};
+    u.onstart=()=>{t0=performance.now()};u.onend=done;u.onerror=done;
+    const fb=setTimeout(done,est*1000+5000);
+    const off=cancelable(()=>{try{speechSynthesis.cancel()}catch(e){}done()});
+    speechSynthesis.speak(u);
+  });
+}
+function recordTurn(sec){
+  return new Promise(res=>{
+    const s=stream.clone();const r=new MediaRecorder(s);const ch=[];
+    r.ondataavailable=e=>{if(e.data.size)ch.push(e.data)};
+    r.onstop=()=>{s.getTracks().forEach(t=>t.stop());off();res(new Blob(ch,{type:r.mimeType||'audio/mp4'}))};
+    const end=()=>{clearTimeout(t);if(r.state!=='inactive')r.stop()};
+    const off=cancelable(end);const t=setTimeout(end,sec*1000);r.start();
+  });
+}
+async function playBlob(b){
+  if(!b||!b.size)return;
+  try{
+    const buf=await ctx.decodeAudioData(await b.arrayBuffer());
+    if(stopped())return;
+    await new Promise(res=>{const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
+      const off=cancelable(()=>{try{src.stop()}catch(e){}done()});let fin=false;function done(){if(fin)return;fin=true;off();res()}
+      src.onended=done;src.start()});
+  }catch(e){
+    await new Promise(res=>{const a=new Audio(URL.createObjectURL(b));const off=cancelable(()=>{a.pause();done()});let fin=false;function done(){if(fin)return;fin=true;off();res()}
+      a.onended=done;a.onerror=done;a.play().catch(done)});
+  }
+}
+function setPhase(t,cls){const p=$('#phase');p.textContent=t;p.className='phase'+(cls?' '+cls:'')}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+$('#startBtn').onclick=async()=>{
+  const pool=prefs.src.flatMap(k=>POOLS[k]||[]);
+  const err=$('#setupErr');err.hidden=true;
+  if(!pool.length){err.textContent='先選至少一種要練的內容。';err.hidden=false;return}
+  /* unlock audio inside the tap (iOS) */
+  try{ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();ctx.resume()}catch(e){}
+  try{speechSynthesis.speak(new SpeechSynthesisUtterance(' '))}catch(e){}
+  if(!(navigator.mediaDevices&&window.MediaRecorder)){err.textContent='這個瀏覽器不能錄音，請用 iPhone／iPad 的 Safari 或 Chrome 打開。';err.hidden=false;return}
+  try{stream=stream&&stream.active?stream:await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true}})}
+  catch(e){err.textContent='沒有麥克風權限。請在瀏覽器設定裡允許這個網站使用麥克風，再按一次開始。';err.hidden=false;return}
+  keepAwake();
+  run={stop:false,cancel:new Set(),queue:[],done:0,t0:Date.now(),chunks:[]};
+  const sr=new MediaRecorder(stream);run.rec=sr;
+  sr.ondataavailable=e=>{if(e.data.size)run&&run.chunks.push(e.data)};
+  sr.start(1000);
+  $('#setup').hidden=true;$('#startBtn').hidden=true;$('#result').hidden=true;$('#running').hidden=false;
+  loop(pool);
+};
+
+async function loop(pool){
+  const r=run;
+  while(!r.stop){
+    if(!r.queue.length)r.queue=shuffle(pool);
+    const it=r.queue.shift();r.skip=false;
+    $('#curEn').textContent=it.en;$('#curZh').textContent=it.zh||'';
+    $('#runMeta').textContent='第 '+(r.done+1)+' 句・已練 '+Math.round((Date.now()-r.t0)/60000)+' 分鐘';
+    setPhase('聽');
+    const dur=await speak(it.en);if(r.stop)break;if(r.skip)continue;
+    for(let i=prefs.recall;i>0&&!r.stop&&!r.skip;i--){setPhase('回想 '+i,'recall');await sleep(1000)}
+    if(r.stop)break;if(r.skip)continue;
+    await beep(880,160);if(r.stop)break;
+    setPhase('● 換你說','rec');
+    const take=await recordTurn(Math.max(2,dur*1.5));if(r.stop)break;
+    await beep(620,160);if(r.stop)break;if(r.skip)continue;
+    setPhase('原音','compare');await speak(it.en);if(r.stop)break;
+    setPhase('你的','compare');await sleep(250);await playBlob(take);if(r.stop)break;
+    r.done++;
+    await sleep(1200);
+  }
+}
+$('#skipBtn').onclick=()=>{if(!run)return;run.skip=true;[...run.cancel].forEach(f=>f())};
+$('#stopBtn').onclick=()=>{
+  if(!run||run.stop)return;const r=run;r.stop=true;[...r.cancel].forEach(f=>f());
+  try{speechSynthesis.cancel()}catch(e){}
+  const secs=Math.round((Date.now()-r.t0)/1000);
+  r.rec.onstop=async()=>{
+    const type=r.rec.mimeType||'audio/mp4';const blob=new Blob(r.chunks,{type});
+    const item={id:Date.now(),date:r.t0,secs,count:r.done,type,blob};
+    run=null;try{if(wakeLock)await wakeLock.release()}catch(e){}wakeLock=null;
+    showResult(item);await dbPut(item);renderHist();
+  };
+  if(r.rec.state!=='inactive')r.rec.stop();else r.rec.onstop();
+  $('#running').hidden=true;$('#setup').hidden=false;$('#startBtn').hidden=false;
+};
+
+/* ---------- results + history (IndexedDB, this device only) ---------- */
+const ext=t=>/webm/.test(t)?'webm':/ogg/.test(t)?'ogg':'m4a';
+const pad=n=>String(n).padStart(2,'0');
+function fname(it){const d=new Date(it.date);return '跟讀紀錄-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes())+'.'+ext(it.type)}
+function label(it){const d=new Date(it.date);return (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes())+'・'+Math.floor(it.secs/60)+' 分 '+(it.secs%60)+' 秒・'+it.count+' 句'}
+async function share(it){
+  const f=new File([it.blob],fname(it),{type:it.type});
+  try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:fname(it)});return}}catch(e){if(e&&e.name==='AbortError')return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(it.blob);a.download=fname(it);document.body.appendChild(a);a.click();a.remove();
+}
+function showResult(it){
+  $('#result').hidden=false;$('#resMeta').textContent=label(it);
+  const url=URL.createObjectURL(it.blob);$('#resAudio').src=url;$('#resDl').href=url;$('#resDl').download=fname(it);
+  $('#resShare').onclick=()=>share(it);
+  $('#result').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function idb(){return new Promise((res,rej)=>{if(!window.indexedDB)return rej();const r=indexedDB.open('drive',1);r.onupgradeneeded=()=>r.result.createObjectStore('sessions',{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function dbPut(it){try{const db=await idb();await new Promise(r=>{const tx=db.transaction('sessions','readwrite');tx.objectStore('sessions').put(it);tx.oncomplete=r;tx.onerror=r})}catch(e){}}
+async function dbAll(){try{const db=await idb();return await new Promise(r=>{const q=db.transaction('sessions').objectStore('sessions').getAll();q.onsuccess=()=>r(q.result||[]);q.onerror=()=>r([])})}catch(e){return[]}}
+async function dbDel(id){try{const db=await idb();db.transaction('sessions','readwrite').objectStore('sessions').delete(id)}catch(e){}}
+async function renderHist(){
+  const list=(await dbAll()).sort((a,b)=>b.id-a.id);const box=$('#hist');box.textContent='';
+  $('#histPanel').hidden=!list.length;
+  list.forEach(it=>{
+    const d=document.createElement('div');d.className='hitem';
+    const m=document.createElement('div');m.className='meta';m.textContent=label(it);
+    const au=document.createElement('audio');au.controls=true;au.preload='none';au.src=URL.createObjectURL(it.blob);
+    const row=document.createElement('div');row.className='row';
+    const sh=document.createElement('button');sh.className='btn';sh.textContent='分享／存到檔案';sh.onclick=()=>share(it);
+    const del=document.createElement('button');del.className='btn';del.textContent='刪除';let armed=false;
+    del.onclick=async()=>{if(!armed){armed=true;del.textContent='再按一次確定刪除';del.style.color='var(--rec)';setTimeout(()=>{armed=false;del.textContent='刪除';del.style.color=''},3000);return}
+      await dbDel(it.id);renderHist()};
+    row.append(sh,del);d.append(m,au,row);box.appendChild(d);
+  });
+}
+renderHist();
+})();
+</script>
+</body>
+</html>
